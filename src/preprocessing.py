@@ -13,8 +13,13 @@ def load_image(image_path: str):
 
     Returns
     -------
-    image : numpy.ndarray
+    numpy.ndarray
         Loaded image.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the image cannot be loaded.
     """
 
     image = cv2.imread(image_path)
@@ -29,7 +34,7 @@ def load_image(image_path: str):
 
 def print_image_info(image):
     """
-    Print useful information about the image.
+    Print useful information about an image.
     """
 
     print("=" * 40)
@@ -44,12 +49,13 @@ def print_image_info(image):
 
     print("=" * 40)
 
-def resize_image(image, max_dimension=1500):
+
+def resize_image(image, max_dimension: int = 1500):
     """
     Resize an image while preserving aspect ratio.
 
-    The longest side of the image is resized to
-    max_dimension. Smaller images are left unchanged.
+    The longest side is resized to `max_dimension`.
+    Images already smaller than this limit are left unchanged.
 
     Parameters
     ----------
@@ -57,7 +63,7 @@ def resize_image(image, max_dimension=1500):
         Input image.
 
     max_dimension : int
-        Maximum size of the longest image dimension.
+        Maximum allowed size of the longest image dimension.
 
     Returns
     -------
@@ -74,12 +80,8 @@ def resize_image(image, max_dimension=1500):
     print(f"Original Size : {width} x {height}")
     print(f"Longest Side  : {longest_side}")
 
-    # Don't enlarge smaller images
     if longest_side <= max_dimension:
-        print("\nResize Information")
-        print("-" * 40)
         print("Image already within size limit.")
-        print(f"Current Size : {width} x {height}")
         print("-" * 40)
         return image
 
@@ -100,32 +102,134 @@ def resize_image(image, max_dimension=1500):
 
     return resized_image
 
-def save_image(image, output_path):
+
+def convert_to_lab(image):
     """
-    Save image to disk.
+    Convert a BGR image to LAB color space.
+
+    Parameters
+    ----------
+    image : numpy.ndarray
+
+    Returns
+    -------
+    numpy.ndarray
     """
 
-    cv2.imwrite(str(output_path), image)
+    return cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+
+
+def split_lab_channels(lab_image):
+    """
+    Split a LAB image into its individual channels.
+
+    Returns
+    -------
+    tuple
+        (L, A, B)
+    """
+
+    return cv2.split(lab_image)
+
+
+def save_image(image, output_path: Path):
+    """
+    Save an image to disk.
+
+    Parameters
+    ----------
+    image : numpy.ndarray
+
+    output_path : pathlib.Path
+    """
+
+    success = cv2.imwrite(str(output_path), image)
+
+    if not success:
+        raise IOError(
+            f"Failed to save image to {output_path}"
+        )
+
+    print(f"✓ Saved: {output_path}")
+
 
 if __name__ == "__main__":
 
+    # -------------------------------------------------
+    # Project paths
+    # -------------------------------------------------
+
     project_root = Path(__file__).resolve().parent.parent
 
-    image_path = project_root / "images" / "raw" / "test.jpg"
+    image_path = (
+        project_root
+        / "images"
+        / "raw"
+        / "test.jpg"
+    )
 
-    # Load image
+    processed_dir = (
+        project_root
+        / "images"
+        / "processed"
+    )
+
+    # Create processed directory if it doesn't exist
+    processed_dir.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    # -------------------------------------------------
+    # Load Image
+    # -------------------------------------------------
+
     original_image = load_image(str(image_path))
 
-    print("Before resizing")
+    print("\nOriginal Image")
     print_image_info(original_image)
 
-    # Resize image
+    # -------------------------------------------------
+    # Resize
+    # -------------------------------------------------
+
     resized_image = resize_image(original_image)
 
-    print("\nAfter resizing")
+    print("\nResized Image")
     print_image_info(resized_image)
 
-    # Save resized image
-    output_path = project_root / "images" / "processed" / "resized.jpg"
+    save_image(
+        resized_image,
+        processed_dir / "resized.jpg"
+    )
 
-    save_image(resized_image, output_path)
+    # -------------------------------------------------
+    # LAB Conversion
+    # -------------------------------------------------
+
+    lab_image = convert_to_lab(resized_image)
+
+    l_channel, a_channel, b_channel = split_lab_channels(
+        lab_image
+    )
+
+    # -------------------------------------------------
+    # Save LAB Channels
+    # -------------------------------------------------
+
+    save_image(
+        l_channel,
+        processed_dir / "l_channel.jpg"
+    )
+
+    save_image(
+        a_channel,
+        processed_dir / "a_channel.jpg"
+    )
+
+    save_image(
+        b_channel,
+        processed_dir / "b_channel.jpg"
+    )
+
+    print("\nPreprocessing stage completed successfully.")
