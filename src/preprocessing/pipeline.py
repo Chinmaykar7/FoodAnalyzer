@@ -1,5 +1,3 @@
-import cv2
-import numpy as np
 from pathlib import Path
 
 from config import (
@@ -10,7 +8,6 @@ from config import (
     MAX_IMAGE_DIMENSION,
     CLAHE_CLIP_LIMIT,
     CLAHE_TILE_GRID_SIZE,
-    MORPH_KERNEL_SIZE,
 )
 
 from preprocessing.io import (
@@ -28,20 +25,15 @@ from preprocessing.contrast import (
     merge_lab_channels,
     convert_lab_to_bgr,
 )
-from preprocessing.threshold import (
-    create_binary_image,
-)
-from preprocessing.morphology import (
-    apply_morphological_closing,
-)
-from preprocessing.contours import (
-    find_contours,
-)
 
 
 def run_preprocessing_pipeline() -> None:
     """
-    Orchestrates the complete image preprocessing pipeline.
+    Orchestrates the complete image preprocessing pipeline:
+    1. Load image
+    2. Resize
+    3. Enhance contrast via CLAHE in LAB color space
+    4. Save resized and enhanced images
     """
 
     # --------------------------------------------------
@@ -108,27 +100,6 @@ def run_preprocessing_pipeline() -> None:
     enhanced_image = convert_lab_to_bgr(enhanced_lab_image)
 
     # --------------------------------------------------
-    # Binary Image
-    # --------------------------------------------------
-
-    binary_image = create_binary_image(enhanced_image)
-
-    # --------------------------------------------------
-    # Morphological Closing
-    # --------------------------------------------------
-
-    closed_image = apply_morphological_closing(
-        binary_image,
-        kernel_size=MORPH_KERNEL_SIZE,
-    )
-
-    # --------------------------------------------------
-    # Find Contours
-    # --------------------------------------------------
-
-    contours = find_contours(closed_image)
-
-    # --------------------------------------------------
     # Save Output Images
     # --------------------------------------------------
 
@@ -140,16 +111,6 @@ def run_preprocessing_pipeline() -> None:
     save_image(
         enhanced_image,
         processed_dir / "enhanced.jpg",
-    )
-
-    save_image(
-        binary_image,
-        processed_dir / "binary.jpg",
-    )
-
-    save_image(
-        closed_image,
-        processed_dir / "closed.jpg",
     )
 
     print("\nPreprocessing pipeline completed successfully.")
