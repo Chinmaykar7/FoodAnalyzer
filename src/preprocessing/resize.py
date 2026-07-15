@@ -1,7 +1,13 @@
 import cv2
+import numpy as np
+
+from config import RESIZE_MAX_DIMENSION
 
 
-def resize_image(image, max_dimension: int = 1500):
+def resize_image(
+    image: np.ndarray,
+    max_dimension: int = RESIZE_MAX_DIMENSION,
+) -> np.ndarray:
     """
     Resize an image while preserving aspect ratio.
 
@@ -48,7 +54,7 @@ def resize_image(image, max_dimension: int = 1500):
     resized_image = cv2.resize(
         image,
         (new_width, new_height),
-        interpolation=cv2.INTER_AREA
+        interpolation=cv2.INTER_AREA,
     )
 
     return resized_image

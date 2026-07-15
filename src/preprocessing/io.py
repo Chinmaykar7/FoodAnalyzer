@@ -1,8 +1,9 @@
-from pathlib import Path
 import cv2
+import numpy as np
+from pathlib import Path
 
 
-def load_image(image_path: str):
+def load_image(image_path: str) -> np.ndarray:
     """
     Load an image from disk.
 
@@ -32,18 +33,18 @@ def load_image(image_path: str):
     return image
 
 
-def save_image(image, output_path: Path):
+def save_image(image: np.ndarray, output_path: Path) -> None:
     """
     Save an image to disk.
 
     Parameters
     ----------
     image : numpy.ndarray
+        Image to save.
 
     output_path : pathlib.Path
+        Output file path.
     """
-
-    output_path.parent.mkdir(parents=True, exist_ok=True)
 
     success = cv2.imwrite(str(output_path), image)
 
@@ -52,10 +53,10 @@ def save_image(image, output_path: Path):
             f"Failed to save image to {output_path}"
         )
 
-    print(f"✓ Saved: {output_path}")
+    print(f"Saved: {output_path}")
 
 
-def print_image_info(image):
+def print_image_info(image: np.ndarray) -> None:
     """
     Print useful information about an image.
     """

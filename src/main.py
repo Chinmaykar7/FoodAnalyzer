@@ -1,0 +1,3 @@
+from preprocessing.pipeline import run_preprocessing_pipeline
+
+run_preprocessing_pipeline()
