@@ -131,6 +131,65 @@ def split_lab_channels(lab_image):
 
     return cv2.split(lab_image)
 
+def apply_clahe(
+    l_channel,
+    clip_limit: float = 5.0,
+    tile_grid_size: tuple = (8, 8)
+):
+    """
+    Apply CLAHE (Contrast Limited Adaptive Histogram Equalization)
+    to the L (Lightness) channel.
+
+    Parameters
+    ----------
+    l_channel : numpy.ndarray
+        Lightness channel from LAB image.
+
+    clip_limit : float
+        Limits contrast amplification.
+
+    tile_grid_size : tuple
+        Size of the local grid used by CLAHE.
+
+    Returns
+    -------
+    numpy.ndarray
+        Enhanced L channel.
+    """
+
+    clahe = cv2.createCLAHE(
+        clipLimit=clip_limit,
+        tileGridSize=tile_grid_size
+    )
+
+    enhanced_l = clahe.apply(l_channel)
+
+    return enhanced_l
+
+
+def merge_lab_channels(
+    l_channel,
+    a_channel,
+    b_channel
+):
+    """
+    Merge the LAB channels into a single LAB image.
+    """
+
+    return cv2.merge(
+        (l_channel, a_channel, b_channel)
+    )
+
+
+def convert_lab_to_bgr(lab_image):
+    """
+    Convert LAB image back to BGR.
+    """
+
+    return cv2.cvtColor(
+        lab_image,
+        cv2.COLOR_LAB2BGR
+    )
 
 def save_image(image, output_path: Path):
     """
@@ -198,10 +257,6 @@ if __name__ == "__main__":
     print("\nResized Image")
     print_image_info(resized_image)
 
-    save_image(
-        resized_image,
-        processed_dir / "resized.jpg"
-    )
 
     # -------------------------------------------------
     # LAB Conversion
@@ -214,22 +269,43 @@ if __name__ == "__main__":
     )
 
     # -------------------------------------------------
+    # Apply CLAHE to L channel
+    # -------------------------------------------------
+
+    enhanced_l_channel = apply_clahe(l_channel)
+
+    # -------------------------------------------------
+    # Merge channels
+    # -------------------------------------------------
+
+    enhanced_lab_image = merge_lab_channels(
+        enhanced_l_channel,
+        a_channel,
+        b_channel
+    )
+
+    # -------------------------------------------------
+    # Convert back to BGR
+    # -------------------------------------------------
+
+    enhanced_image = convert_lab_to_bgr(
+        enhanced_lab_image
+    )
+
+    # -------------------------------------------------
     # Save LAB Channels
     # -------------------------------------------------
 
     save_image(
-        l_channel,
-        processed_dir / "l_channel.jpg"
+        resized_image,
+        processed_dir / "resized.jpg"
     )
 
     save_image(
-        a_channel,
-        processed_dir / "a_channel.jpg"
+        enhanced_image,
+        processed_dir / "enhanced.jpg"
     )
 
-    save_image(
-        b_channel,
-        processed_dir / "b_channel.jpg"
-    )
+    print("\nCLAHE enhancement completed successfully.")
 
-    print("\nPreprocessing stage completed successfully.")
+  
