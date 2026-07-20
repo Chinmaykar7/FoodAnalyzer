@@ -2,9 +2,7 @@ from pathlib import Path
 
 from config import (
     PROJECT_ROOT,
-    RAW_IMAGES_FOLDER,
     PROCESSED_IMAGES_FOLDER,
-    RAW_IMAGE_NAME,
     MAX_IMAGE_DIMENSION,
     CLAHE_CLIP_LIMIT,
     CLAHE_TILE_GRID_SIZE,
@@ -15,9 +13,11 @@ from preprocessing.io import (
     save_image,
     print_image_info,
 )
+
 from preprocessing.resize import (
     resize_image,
 )
+
 from preprocessing.contrast import (
     convert_to_lab,
     split_lab_channels,
@@ -27,25 +27,42 @@ from preprocessing.contrast import (
 )
 
 
-def run_preprocessing_pipeline() -> None:
+def run_preprocessing_pipeline(image_path: Path) -> Path:
     """
-    Orchestrates the complete image preprocessing pipeline:
-    1. Load image
-    2. Resize
-    3. Enhance contrast via CLAHE in LAB color space
-    4. Save resized and enhanced images
+    Run the complete image preprocessing pipeline.
+
+    Steps:
+        1. Load image
+        2. Resize image
+        3. Enhance contrast using CLAHE in LAB color space
+        4. Save resized and enhanced images
+
+    Args:
+        image_path:
+            Path to the raw input image.
+
+    Returns:
+        Path to the enhanced image.
     """
 
     # --------------------------------------------------
-    # Project paths
+    # Validate input
     # --------------------------------------------------
 
-    image_path = PROJECT_ROOT / RAW_IMAGES_FOLDER / RAW_IMAGE_NAME
+    image_path = Path(image_path).resolve()
+
+    if not image_path.exists():
+        raise FileNotFoundError(f"Image not found: {image_path}")
+
+    # --------------------------------------------------
+    # Output directory
+    # --------------------------------------------------
 
     processed_dir = PROJECT_ROOT / PROCESSED_IMAGES_FOLDER
-
-    # Create processed directory if it doesn't exist
     processed_dir.mkdir(parents=True, exist_ok=True)
+
+    resized_image_path = processed_dir / "resized.jpg"
+    enhanced_image_path = processed_dir / "enhanced.jpg"
 
     # --------------------------------------------------
     # Load Image
@@ -60,7 +77,10 @@ def run_preprocessing_pipeline() -> None:
     # Resize
     # --------------------------------------------------
 
-    resized_image = resize_image(original_image, max_dimension=MAX_IMAGE_DIMENSION)
+    resized_image = resize_image(
+        original_image,
+        max_dimension=MAX_IMAGE_DIMENSION,
+    )
 
     print("\nResized Image")
     print_image_info(resized_image)
@@ -74,7 +94,7 @@ def run_preprocessing_pipeline() -> None:
     l_channel, a_channel, b_channel = split_lab_channels(lab_image)
 
     # --------------------------------------------------
-    # Apply CLAHE to L channel
+    # Apply CLAHE
     # --------------------------------------------------
 
     enhanced_l_channel = apply_clahe(
@@ -84,7 +104,7 @@ def run_preprocessing_pipeline() -> None:
     )
 
     # --------------------------------------------------
-    # Merge channels
+    # Merge Channels
     # --------------------------------------------------
 
     enhanced_lab_image = merge_lab_channels(
@@ -97,20 +117,24 @@ def run_preprocessing_pipeline() -> None:
     # Convert back to BGR
     # --------------------------------------------------
 
-    enhanced_image = convert_lab_to_bgr(enhanced_lab_image)
+    enhanced_image = convert_lab_to_bgr(
+        enhanced_lab_image,
+    )
 
     # --------------------------------------------------
-    # Save Output Images
+    # Save Images
     # --------------------------------------------------
 
     save_image(
         resized_image,
-        processed_dir / "resized.jpg",
+        resized_image_path,
     )
 
     save_image(
         enhanced_image,
-        processed_dir / "enhanced.jpg",
+        enhanced_image_path,
     )
 
-    print("\nPreprocessing pipeline completed successfully.")
+    print("\n✅ Preprocessing completed successfully.")
+
+    return enhanced_image_path
