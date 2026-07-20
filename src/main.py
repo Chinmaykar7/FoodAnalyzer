@@ -8,7 +8,7 @@ from preprocessing.pipeline import (
     run_preprocessing_pipeline,
 )
 
-from models.extractor import (
+from extraction.extractor import (
     IngredientExtractor,
 )
 
@@ -29,7 +29,7 @@ def main() -> None:
     )
 
     # --------------------------------------------------
-    # Stage 1 - Preprocessing
+    # Stage 1 - Image Preprocessing
     # --------------------------------------------------
 
     enhanced_image_path = run_preprocessing_pipeline(
@@ -40,9 +40,9 @@ def main() -> None:
     # Stage 2 - Ingredient Extraction
     # --------------------------------------------------
 
-    extractor = IngredientExtractor()
+    ingredient_extractor = IngredientExtractor()
 
-    ingredients = extractor.extract(
+    ingredient_text = ingredient_extractor.extract(
         enhanced_image_path
     )
 
@@ -51,7 +51,7 @@ def main() -> None:
     # --------------------------------------------------
 
     print("\n========== Extracted Ingredients ==========\n")
-    print(ingredients)
+    print(ingredient_text)
 
 
 if __name__ == "__main__":

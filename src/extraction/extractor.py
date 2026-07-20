@@ -2,7 +2,7 @@ from pathlib import Path
 
 from ollama import chat
 
-from .prompt_loader import PromptLoader
+from llm.prompt_loader import PromptLoader
 
 
 class IngredientExtractor:
