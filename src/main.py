@@ -1,3 +1,5 @@
+import json
+
 from config import (
     PROJECT_ROOT,
     RAW_IMAGES_FOLDER,
@@ -10,6 +12,10 @@ from preprocessing.pipeline import (
 
 from extraction.extractor import (
     IngredientExtractor,
+)
+
+from parsing.parser import (
+    FoodLabelParser,
 )
 
 
@@ -37,21 +43,31 @@ def main() -> None:
     )
 
     # --------------------------------------------------
-    # Stage 2 - Ingredient Extraction
+    # Stage 2 - Food Label Extraction
     # --------------------------------------------------
 
-    ingredient_extractor = IngredientExtractor()
+    food_label_extractor = IngredientExtractor()
 
-    ingredient_text = ingredient_extractor.extract(
+    label_text = food_label_extractor.extract(
         enhanced_image_path
+    )
+
+    # --------------------------------------------------
+    # Stage 3 - Food Label Parsing
+    # --------------------------------------------------
+
+    food_label_parser = FoodLabelParser()
+
+    parsed_food_data = food_label_parser.parse(
+        label_text
     )
 
     # --------------------------------------------------
     # Display Result
     # --------------------------------------------------
 
-    print("\n========== Extracted Ingredients ==========\n")
-    print(ingredient_text)
+    print("\n========== Structured Food Data ==========\n")
+    print(json.dumps(parsed_food_data, indent=4))
 
 
 if __name__ == "__main__":

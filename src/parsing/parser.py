@@ -3,19 +3,6 @@ import json
 from llm.ollama_client import OllamaClient
 from llm.prompt_loader import PromptLoader
 
-NUTRIENT_FIELDS = {
-    "energy",
-    "protein",
-    "carbohydrates",
-    "total_sugars",
-    "added_sugars",
-    "total_fat",
-    "saturated_fat",
-    "trans_fat",
-    "dietary_fiber",
-    "sodium",
-}
-
 
 class FoodLabelParser:
     """
@@ -77,6 +64,9 @@ class FoodLabelParser:
         """
         Remove common formatting added around a JSON model response.
 
+        Strips markdown code fences (```json ... ```) that some models
+        wrap around their JSON output.
+
         Args:
             response:
                 Raw response returned by the language model.
@@ -100,6 +90,9 @@ class FoodLabelParser:
     ) -> dict[str, object]:
         """
         Extract the first complete JSON object from a model response.
+
+        Handles responses that contain surrounding text such as
+        "Here is the JSON:" before the actual JSON payload.
 
         Args:
             response:
@@ -200,7 +193,11 @@ class FoodLabelParser:
     @staticmethod
     def _validate(data: dict[str, object]) -> None:
         """
-        Validate the top-level structure of parsed food data.
+        Validate the structure of parsed food data.
+
+        Checks that the top-level keys, ingredient fields, and nutrition
+        sections conform to the expected schema.  Rejects nested ingredient
+        hierarchies (``children``, ``parent``, ``sub_ingredients``).
 
         Args:
             data:
@@ -220,7 +217,29 @@ class FoodLabelParser:
                 "'ingredients' must be a list."
             )
 
-        for i, ingredient in enumerate(data["ingredients"]):
+        FoodLabelParser._validate_ingredients(data["ingredients"])
+
+        if "nutrition" in data:
+            FoodLabelParser._validate_nutrition(data["nutrition"])
+
+    @staticmethod
+    def _validate_ingredients(ingredients: object) -> None:
+        """
+        Validate the ingredients list.
+
+        Each ingredient must be a flat dictionary with ``name`` (string),
+        ``percentage`` (number or null), and ``code`` (string or null).
+        Nested hierarchy keys are forbidden.
+
+        Args:
+            ingredients:
+                The ingredients value from the parsed response.
+
+        Raises:
+            ValueError: If any ingredient is invalid.
+        """
+
+        for i, ingredient in enumerate(ingredients):
             if not isinstance(ingredient, dict):
                 raise ValueError(
                     f"Ingredient at index {i} must be an object."
@@ -231,103 +250,210 @@ class FoodLabelParser:
                     f"Ingredient at index {i} is missing 'name'."
                 )
 
-            if "children" in ingredient:
+            name = ingredient["name"]
+            if not isinstance(name, str):
                 raise ValueError(
-                    f"Ingredient at index {i} contains 'children'. "
-                    "Ingredients must be a flat list."
+                    f"Ingredient at index {i} 'name' must be a string."
                 )
 
-            if "parent" in ingredient:
+            if "percentage" in ingredient:
+                percentage = ingredient["percentage"]
+                if percentage is not None and not isinstance(
+                    percentage, (int, float)
+                ):
+                    raise ValueError(
+                        f"Ingredient at index {i} 'percentage' "
+                        "must be a number or null."
+                    )
+
+            if "code" in ingredient:
+                code = ingredient["code"]
+                if code is not None and not isinstance(code, str):
+                    raise ValueError(
+                        f"Ingredient at index {i} 'code' "
+                        "must be a string or null."
+                    )
+
+            forbidden_keys = {"children", "parent", "sub_ingredients"}
+            for key in forbidden_keys:
+                if key in ingredient:
+                    raise ValueError(
+                        f"Ingredient at index {i} contains '{key}'. "
+                        "Ingredients must be a flat list."
+                    )
+
+    @staticmethod
+    def _validate_nutrition(nutrition: object) -> None:
+        """
+        Validate the nutrition dictionary.
+
+        ``serving_size`` must be a ``{value, unit}`` dict if present.
+        ``servings_per_pack`` must be a number if present.
+        All other sections (``per_serving``, ``per_100g``, etc.) must be
+        dicts mapping nutrient names to ``{value, unit}`` objects.
+
+        Optional nutrition basis sections (``per_100g``, ``per_100ml``,
+        ``per_serving``, ``per_package``) that are ``null`` are silently
+        removed before validation, treating them as "not provided".
+
+        Args:
+            nutrition:
+                The nutrition value from the parsed response.
+
+        Raises:
+            ValueError: If the nutrition structure is invalid.
+        """
+
+        if not isinstance(nutrition, dict):
+            raise ValueError(
+                "'nutrition' must be an object."
+            )
+
+        _OPTIONAL_BASIS_SECTIONS = {
+            "per_100g",
+            "per_100ml",
+            "per_serving",
+            "per_package",
+        }
+
+        for key in list(nutrition.keys()):
+            if (
+                key in _OPTIONAL_BASIS_SECTIONS
+                and nutrition[key] is None
+            ):
+                del nutrition[key]
+
+        for key, section in nutrition.items():
+            if key == "serving_size":
+                FoodLabelParser._validate_serving_size(section)
+            elif key == "servings_per_pack":
+                FoodLabelParser._validate_servings_per_pack(section)
+            else:
+                FoodLabelParser._validate_nutrient_section(key, section)
+
+    @staticmethod
+    def _validate_serving_size(section: object) -> None:
+        """
+        Validate the ``serving_size`` structure.
+
+        Must be a dict with ``value`` (number or null) and ``unit``
+        (string or null).
+
+        Args:
+            section:
+                The serving_size value to validate.
+
+        Raises:
+            ValueError: If the structure is invalid.
+        """
+
+        if not isinstance(section, dict):
+            raise ValueError(
+                "'serving_size' must be an object."
+            )
+
+        if "value" not in section:
+            raise ValueError(
+                "'serving_size' is missing 'value'."
+            )
+
+        if "unit" not in section:
+            raise ValueError(
+                "'serving_size' is missing 'unit'."
+            )
+
+        value = section["value"]
+        if value is not None and not isinstance(value, (int, float)):
+            raise ValueError(
+                "'serving_size' 'value' must be a number or null."
+            )
+
+        unit = section["unit"]
+        if unit is not None and not isinstance(unit, str):
+            raise ValueError(
+                "'serving_size' 'unit' must be a string or null."
+            )
+
+    @staticmethod
+    def _validate_servings_per_pack(section: object) -> None:
+        """
+        Validate the ``servings_per_pack`` value.
+
+        Must be a number (int or float).
+
+        Args:
+            section:
+                The servings_per_pack value to validate.
+
+        Raises:
+            ValueError: If the value is not a number.
+        """
+
+        if not isinstance(section, (int, float)):
+            raise ValueError(
+                "'servings_per_pack' must be a number."
+            )
+
+    @staticmethod
+    def _validate_nutrient_section(
+        key: str,
+        section: object,
+    ) -> None:
+        """
+        Validate a nutrient section such as ``per_serving`` or ``per_100g``.
+
+        Must be a dict mapping nutrient names to ``{value, unit}`` objects.
+
+        Args:
+            key:
+                The section name (e.g. ``per_serving``).
+
+            section:
+                The section value to validate.
+
+        Raises:
+            ValueError: If the section structure is invalid.
+        """
+
+        if not isinstance(section, dict):
+            raise ValueError(
+                f"Nutrition section '{key}' must be an object."
+            )
+
+        for nutrient_name, nutrient_value in section.items():
+            if not isinstance(nutrient_value, dict):
                 raise ValueError(
-                    f"Ingredient at index {i} contains 'parent'. "
-                    "Ingredients must be a flat list."
+                    f"Nutrient '{nutrient_name}' in '{key}' "
+                    "must be an object."
                 )
 
-            if "sub_ingredients" in ingredient:
+            if "value" not in nutrient_value:
                 raise ValueError(
-                    f"Ingredient at index {i} contains 'sub_ingredients'. "
-                    "Ingredients must be a flat list."
+                    f"Nutrient '{nutrient_name}' in '{key}' "
+                    "is missing 'value'."
                 )
 
-        if "nutrition" in data:
-            nutrition = data["nutrition"]
-
-            if not isinstance(nutrition, dict):
+            if "unit" not in nutrient_value:
                 raise ValueError(
-                    "'nutrition' must be an object."
+                    f"Nutrient '{nutrient_name}' in '{key}' "
+                    "is missing 'unit'."
                 )
 
-            if "serving_size" in nutrition:
-                serving_size = nutrition["serving_size"]
+            value = nutrient_value["value"]
+            if value is not None and not isinstance(
+                value, (int, float)
+            ):
+                raise ValueError(
+                    f"Nutrient '{nutrient_name}' in '{key}' "
+                    "'value' must be a number or null."
+                )
 
-                if not isinstance(serving_size, dict):
-                    raise ValueError(
-                        "'serving_size' must be an object."
-                    )
-
-                if "value" not in serving_size:
-                    raise ValueError(
-                        "'serving_size' is missing 'value'."
-                    )
-
-                if "unit" not in serving_size:
-                    raise ValueError(
-                        "'serving_size' is missing 'unit'."
-                    )
-
-                value = serving_size["value"]
-                if value is not None and not isinstance(value, (int, float)):
-                    raise ValueError(
-                        "'serving_size' 'value' must be a number or null."
-                    )
-
-                unit = serving_size["unit"]
-                if unit is not None and not isinstance(unit, str):
-                    raise ValueError(
-                        "'serving_size' 'unit' must be a string or null."
-                    )
-
-            for key, section in nutrition.items():
-                if key == "serving_size":
-                    continue
-
-                if not isinstance(section, dict):
-                    raise ValueError(
-                        f"Nutrition section '{key}' must be an object."
-                    )
-
-                for nutrient_name, nutrient_value in section.items():
-                    if not isinstance(nutrient_value, dict):
-                        raise ValueError(
-                            f"Nutrient '{nutrient_name}' in '{key}' "
-                            "must be an object."
-                        )
-
-                    if "value" not in nutrient_value:
-                        raise ValueError(
-                            f"Nutrient '{nutrient_name}' in '{key}' "
-                            "is missing 'value'."
-                        )
-
-                    if "unit" not in nutrient_value:
-                        raise ValueError(
-                            f"Nutrient '{nutrient_name}' in '{key}' "
-                            "is missing 'unit'."
-                        )
-
-                    value = nutrient_value["value"]
-                    if value is not None and not isinstance(value, (int, float)):
-                        raise ValueError(
-                            f"Nutrient '{nutrient_name}' in '{key}' "
-                            "'value' must be a number or null."
-                        )
-
-                    unit = nutrient_value["unit"]
-                    if unit is not None and not isinstance(unit, str):
-                        raise ValueError(
-                            f"Nutrient '{nutrient_name}' in '{key}' "
-                            "'unit' must be a string or null."
-                        )
+            unit = nutrient_value["unit"]
+            if unit is not None and not isinstance(unit, str):
+                raise ValueError(
+                    f"Nutrient '{nutrient_name}' in '{key}' "
+                    "'unit' must be a string or null."
+                )
 
     @classmethod
     def _build_parse_error(

@@ -25,92 +25,40 @@ Use the following schema:
             "value": number | null,
             "unit": string | null
         },
+        "servings_per_pack": number | null,
         "per_100g": {
-            "energy": {
-                "value": number | null,
-                "unit": string | null
-            },
-            "protein": {
-                "value": number | null,
-                "unit": string | null
-            },
-            "carbohydrates": {
-                "value": number | null,
-                "unit": string | null
-            },
-            "total_sugars": {
-                "value": number | null,
-                "unit": string | null
-            },
-            "added_sugars": {
-                "value": number | null,
-                "unit": string | null
-            },
-            "total_fat": {
-                "value": number | null,
-                "unit": string | null
-            },
-            "saturated_fat": {
-                "value": number | null,
-                "unit": string | null
-            },
-            "trans_fat": {
-                "value": number | null,
-                "unit": string | null
-            },
-            "dietary_fiber": {
-                "value": number | null,
-                "unit": string | null
-            },
-            "sodium": {
-                "value": number | null,
-                "unit": string | null
-            }
+            "energy":       { "value": number | null, "unit": string | null },
+            "protein":      { "value": number | null, "unit": string | null },
+            "carbohydrates":{ "value": number | null, "unit": string | null },
+            "total_sugars": { "value": number | null, "unit": string | null },
+            "added_sugars": { "value": number | null, "unit": string | null },
+            "total_fat":    { "value": number | null, "unit": string | null },
+            "saturated_fat":{ "value": number | null, "unit": string | null },
+            "trans_fat":    { "value": number | null, "unit": string | null },
+            "dietary_fiber":{ "value": number | null, "unit": string | null },
+            "sodium":       { "value": number | null, "unit": string | null }
         },
         "per_serving": {
-            "energy": {
-                "value": number | null,
-                "unit": string | null
-            },
-            "protein": {
-                "value": number | null,
-                "unit": string | null
-            },
-            "carbohydrates": {
-                "value": number | null,
-                "unit": string | null
-            },
-            "total_sugars": {
-                "value": number | null,
-                "unit": string | null
-            },
-            "added_sugars": {
-                "value": number | null,
-                "unit": string | null
-            },
-            "total_fat": {
-                "value": number | null,
-                "unit": string | null
-            },
-            "saturated_fat": {
-                "value": number | null,
-                "unit": string | null
-            },
-            "trans_fat": {
-                "value": number | null,
-                "unit": string | null
-            },
-            "dietary_fiber": {
-                "value": number | null,
-                "unit": string | null
-            },
-            "sodium": {
-                "value": number | null,
-                "unit": string | null
-            }
+            "energy":       { "value": number | null, "unit": string | null },
+            "protein":      { "value": number | null, "unit": string | null },
+            "carbohydrates":{ "value": number | null, "unit": string | null },
+            "total_sugars": { "value": number | null, "unit": string | null },
+            "added_sugars": { "value": number | null, "unit": string | null },
+            "total_fat":    { "value": number | null, "unit": string | null },
+            "saturated_fat":{ "value": number | null, "unit": string | null },
+            "trans_fat":    { "value": number | null, "unit": string | null },
+            "dietary_fiber":{ "value": number | null, "unit": string | null },
+            "sodium":       { "value": number | null, "unit": string | null }
         }
     }
 }
+
+IMPORTANT: The "per_100g" and "per_serving" sections are OPTIONAL.
+Only include a section if that nutritional context is explicitly present in the source text.
+If the source does not contain per-100g data, OMIT "per_100g" entirely.
+If the source does not contain per-serving data, OMIT "per_serving" entirely.
+Do NOT create "per_100g": null or "per_100g": {}.
+Do NOT create "per_serving": null or "per_serving": {}.
 
 INGREDIENT RULES:
 
@@ -121,19 +69,22 @@ INGREDIENT RULES:
 5. "name": The ingredient name exactly as extracted.
 6. "percentage": Use the percentage only when explicitly provided. Use null if not present.
 7. "code": Use for additive/INS codes when explicitly present. Use null if not present.
-8. Remove the % symbol from percentage values.
-9. Do not invent percentages or codes.
-10. Use null whenever information is missing. Do NOT use 0 for missing values.
+8. The "code" field MUST always be a JSON string or null. NEVER return an INS/additive code as a JSON number. Even if the code contains only digits (e.g. 551, 950, 951, 955), it MUST be enclosed in JSON quotes. "code" is an identifier, not a numerical measurement.
+9. If an ingredient has multiple INS codes (e.g. "INS 951, INS 955"), join them as a single comma-separated string: "951, 955". Do NOT return an array. Do NOT drop any codes.
+10. Correct: "code": "551"  Incorrect: "code": 551
+11. Remove the % symbol from percentage values.
+12. Do not invent percentages or codes.
+13. Use null whenever information is missing. Do NOT use 0 for missing values.
 
 NUTRITION RULES:
 
-1. Preserve the nutritional context exactly as shown (per 100g, per serving, etc.).
+1. Only include "per_serving" if per-serving values are explicitly present in the source. Only include "per_100g" if per-100g values are explicitly present. If neither is present, omit both.
 2. "serving_size": Include when explicitly present. Use null values if not provided.
-3. "per_100g": Include nutrients that are explicitly stated as per 100g.
-4. "per_serving": Include nutrients that are explicitly stated as per serving.
-5. Each nutrient has "value" (number) and "unit" (string).
-6. Do NOT force a nutrient into a section if it does not exist in the source.
-7. Do NOT calculate or convert values between sections.
+3. "servings_per_pack": Include when explicitly present. Use null if not provided.
+4. Each nutrient has "value" (number) and "unit" (string).
+5. Do NOT force a nutrient into a section if it does not exist in the source.
+6. Do NOT calculate or convert values between sections.
+7. Do NOT calculate per-100g from per-serving (or vice versa).
 8. Do NOT invent nutrients that are not present.
 9. Use null for missing values. Do NOT use 0 to represent missing information.
 10. 0 means the label explicitly states zero.
